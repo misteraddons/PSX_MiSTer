@@ -69,9 +69,10 @@ module sys_top
 
 `else
 	//////////// VGA ///////////
-	output  [5:0] VGA_R,
-	output  [5:0] VGA_G,
-	output  [5:0] VGA_B,
+
+	output  [7:0] VGA_R, // TODO: Size output based on SDCD (7:0 if spdif==1, 7:2 if spdif=0)
+	output  [7:0] VGA_G, // TODO: Size output based on SDCD (7:0 if spdif==1, 7:2 if spdif=0)
+	output  [7:0] VGA_B, // TODO: Size output based on SDCD (7:0 if spdif==1, 7:2 if spdif=0)
 	inout         VGA_HS,  // VGA_HS is secondary SD card detect when VGA_EN = 1 (inactive)
 	output		  VGA_VS,
 	input         VGA_EN,  // active low
@@ -82,9 +83,9 @@ module sys_top
 	output		  AUDIO_SPDIF,
 
 	//////////// SDIO ///////////
-	inout   [3:0] SDIO_DAT,
-	inout         SDIO_CMD,
-	output        SDIO_CLK,
+	//inout   [3:0] SDIO_DAT,  // TODO: assign SDIO_DAT if SPDIF==0, else RGB
+	//inout         SDIO_CMD,  // TODO: assign SDIO_CMD if SPDIF==0, else RGB
+	//output        SDIO_CLK,  // TODO: assign SDIO_CLK if SPDIF==0, else RGB
 
 	//////////// I/O ///////////
 	output        LED_USER,
@@ -125,27 +126,29 @@ module sys_top
 );
 
 //////////////////////  Secondary SD  ///////////////////////////////////
+
 wire SD_CS, SD_CLK, SD_MOSI;
 
-`ifndef MISTER_DUAL_SDRAM
-	wire sd_miso = SW[3] | SDIO_DAT[0];
-`else
+//`ifndef MISTER_DUAL_SDRAM // TODO: Uncomment
+	//wire sd_miso = SW[3] | SDIO_DAT[0]; // TODO: Uncomment and update SDIO_DAT[0] name
+//`else // TODO: Uncomment
 	wire sd_miso = 1;
-`endif
-wire SD_MISO = mcp_sdcd ? sd_miso : SD_SPI_MISO;
+//`endif // TODO: Uncomment
+wire SD_MISO = 1'bZ;//mcp_sdcd ? sd_miso : SD_SPI_MISO; // TODO: Uncomment and update SD_SPI_MISO name?
 
-`ifndef MISTER_DUAL_SDRAM
-	assign SDIO_DAT[2:1]= 2'bZZ;
-	assign SDIO_DAT[3]  = SW[3] ? 1'bZ  : SD_CS;
-	assign SDIO_CLK     = SW[3] ? 1'bZ  : SD_CLK;
-	assign SDIO_CMD     = SW[3] ? 1'bZ  : SD_MOSI;
-	assign SD_SPI_CS    = mcp_sdcd ? ((~VGA_EN & sog & ~cs1) ? 1'b1 : 1'bZ) : SD_CS;
-`else
-	assign SD_SPI_CS    = mcp_sdcd ? 1'bZ : SD_CS;
-`endif
+//`ifndef MISTER_DUAL_SDRAM // TODO: Uncomment
+	//assign SDIO_DAT[2:1]= 2'bZZ; // TODO: Uncomment
+	//assign SDIO_DAT[3]  = SW[3] ? 1'bZ  : SD_CS; // TODO: Uncomment
+	//assign SDIO_CLK     = SW[3] ? 1'bZ  : SD_CLK; // TODO: Uncomment
+	//assign SDIO_CMD     = SW[3] ? 1'bZ  : SD_MOSI; // TODO: Uncomment
+	//assign SD_SPI_CS    = mcp_sdcd ? ((~VGA_EN & sog & ~cs1) ? 1'b1 : 1'bZ) : SD_CS; // TODO: Uncomment
+//`else // TODO: Uncomment
+	assign SD_SPI_CS    = (~VGA_EN & sog & ~cs1) ? 1'b1 : 1'bZ;//mcp_sdcd ? 1'bZ : SD_CS; // TODO: Uncomment and figure out logic
+//`endif // TODO: Uncomment
 
-assign SD_SPI_CLK  = mcp_sdcd ? 1'bZ : SD_CLK;
-assign SD_SPI_MOSI = mcp_sdcd ? 1'bZ : SD_MOSI;
+assign SD_SPI_CLK  = 1'bZ;//mcp_sdcd ? 1'bZ : SD_CLK; // TODO: Uncomment
+assign SD_SPI_MOSI = 1'bZ;//mcp_sdcd ? 1'bZ : SD_MOSI; // TODO: Uncomment
+
 
 //////////////////////  LEDs/Buttons  ///////////////////////////////////
 
@@ -1393,11 +1396,11 @@ csync csync_vga(clk_vid, vga_hs_osd, vga_vs_osd, vga_cs_osd);
 
 	wire cs1 = (vga_fb | vga_scaler) ? vgas_cs : vga_cs;
 
-	assign VGA_VS = (VGA_EN | SW[3]) ? 1'bZ      : (((vga_fb | vga_scaler) ? (~vgas_vs ^ VS[12])                         : VGA_DISABLE ? 1'd1 : ~vga_vs) | csync_en);
-	assign VGA_HS = (VGA_EN | SW[3]) ? 1'bZ      :  ((vga_fb | vga_scaler) ? ((csync_en ? ~vgas_cs : ~vgas_hs) ^ HS[12]) : VGA_DISABLE ? 1'd1 : (csync_en ? ~vga_cs : ~vga_hs));
-	assign VGA_R  = (VGA_EN | SW[3]) ? 6'bZZZZZZ :   (vga_fb | vga_scaler) ? vgas_o[23:18]                               : VGA_DISABLE ? 6'd0 : vga_o[23:18];
-	assign VGA_G  = (VGA_EN | SW[3]) ? 6'bZZZZZZ :   (vga_fb | vga_scaler) ? vgas_o[15:10]                               : VGA_DISABLE ? 6'd0 : vga_o[15:10];
-	assign VGA_B  = (VGA_EN | SW[3]) ? 6'bZZZZZZ :   (vga_fb | vga_scaler) ? vgas_o[7:2]                                 : VGA_DISABLE ? 6'd0 : vga_o[7:2]  ;
+	assign VGA_VS = (VGA_EN | SW[3]) ? 1'bZ        : (((vga_fb | vga_scaler) ? (~vgas_vs ^ VS[12])                         : VGA_DISABLE ? 1'd1 : ~vga_vs) | csync_en);
+	assign VGA_HS = (VGA_EN | SW[3]) ? 1'bZ        :  ((vga_fb | vga_scaler) ? ((csync_en ? ~vgas_cs : ~vgas_hs) ^ HS[12]) : VGA_DISABLE ? 1'd1 : (csync_en ? ~vga_cs : ~vga_hs));
+	assign VGA_R  = (VGA_EN | SW[3]) ? 8'bZZZZZZZZ :   (vga_fb | vga_scaler) ? vgas_o[23:16]                               : VGA_DISABLE ? 8'd0 : vga_o[23:16]; // TODO: size output based on sd card presence
+	assign VGA_G  = (VGA_EN | SW[3]) ? 8'bZZZZZZZZ :   (vga_fb | vga_scaler) ? vgas_o[15:8]                               : VGA_DISABLE ? 8'd0 : vga_o[15:8]; // TODO: size output based on sd card presence
+	assign VGA_B  = (VGA_EN | SW[3]) ? 8'bZZZZZZZZ :   (vga_fb | vga_scaler) ? vgas_o[7:0]                                 : VGA_DISABLE ? 8'd0 : vga_o[7:0]; // TODO: size output based on sd card presence
 `endif
 
 reg video_sync = 0;
@@ -1427,14 +1430,14 @@ end
 
 /////////////////////////  Audio output  ////////////////////////////////
 
-assign SDCD_SPDIF =(SW[3] & ~spdif) ? 1'b0 : 1'bZ;
+assign SDCD_SPDIF =(SW[3] & ~spdif) ? 1'b0 : 1'bZ; // TODO: If digital IO & secondary SD, output 0, else hiz
 
 `ifndef MISTER_DUAL_SDRAM
 	wire analog_l, analog_r;
 
-	assign AUDIO_SPDIF = SW[3] ? 1'bZ : SW[0] ? HDMI_LRCLK : spdif;
-	assign AUDIO_R     = SW[3] ? 1'bZ : SW[0] ? HDMI_I2S   : analog_r;
-	assign AUDIO_L     = SW[3] ? 1'bZ : SW[0] ? HDMI_SCLK  : analog_l;
+	assign AUDIO_SPDIF = SW[3] ? 1'bZ : SW[0] ? HDMI_LRCLK : spdif; // TODO: If digital IO then hiz else if SW0 on then spdif
+	assign AUDIO_R     = SW[3] ? 1'bZ : SW[0] ? HDMI_I2S   : analog_r; // TODO: If digital IO then hiz else if SW0 off then audio right
+	assign AUDIO_L     = SW[3] ? 1'bZ : SW[0] ? HDMI_SCLK  : analog_l; // TODO: If digital IO then hiz else if SW0 off then audio left
 `endif
 
 assign HDMI_MCLK = clk_audio;
@@ -1738,7 +1741,7 @@ emu emu
 `ifdef MISTER_DUAL_SDRAM
 	.SD_CD(mcp_sdcd),
 `else
-	.SD_CD(mcp_sdcd & (SW[0] ? VGA_HS : (SW[3] | SDCD_SPDIF))),
+	.SD_CD(mcp_sdcd & (SW[0] ? VGA_HS : (SW[3] | SDCD_SPDIF))), // TODO: ???
 `endif
 
 	.UART_CTS(uart_rts),
