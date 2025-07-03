@@ -1762,11 +1762,11 @@ wire actionNextPadSnac;
 
 // SNAC System Link signals
 wire snac_txd;
-wire snac_rxd;
+reg snac_rxd;
 wire snac_rts;
-wire snac_cts;
+reg snac_cts;
 wire snac_dtr;
-wire snac_dsr;
+reg snac_dsr;
 
 reg [7:0]Send;
 reg [7:0]Receive;
@@ -1833,6 +1833,11 @@ begin
 		ack         <= 1'b1;       
 		Dat         <= 1'b1;       
 		irq10Snac   <= 1'b0;
+		
+		// SNAC System Link input assignments
+		snac_rxd    <= ~USER_IN[4]; // RXD input (inverted)
+		snac_cts    <= ~USER_IN[3]; // CTS input (inverted)
+		snac_dsr    <= ~USER_IN[5]; // DSR input (inverted)
 	end
 	else if (snacPort1 || snacPort2) begin
 		USER_OUT[0] <= ~selectedPort2Snac;
@@ -1853,18 +1858,24 @@ begin
 			USER_OUT[6] <= 1'b1;
 			irq10Snac   <= ~USER_IN6_2;
 		end
+		
+		// SNAC System Link default values for joypad mode
+		snac_rxd  <= 1'b1; // Idle high
+		snac_cts  <= 1'b1; // Ready
+		snac_dsr  <= 1'b1; // Ready
 	end
 	else begin
 		USER_OUT  <= '1;
 		irq10Snac <= 1'b0;
 		ack       <= 1'b1;
 		Dat       <= 1'b1;
+		
+		// SNAC System Link default values
+		snac_rxd  <= 1'b1; // Idle high
+		snac_cts  <= 1'b1; // Ready
+		snac_dsr  <= 1'b1; // Ready
 	end
 
-	// SNAC System Link input assignments
-	assign snac_rxd = snacSystemLink ? ~USER_IN[4] : 1'b1; // RXD input (inverted)
-	assign snac_cts = snacSystemLink ? ~USER_IN[3] : 1'b1; // CTS input (inverted)
-	assign snac_dsr = snacSystemLink ? ~USER_IN[5] : 1'b1; // DSR input (inverted)
 
 	oldselectedPort1 <= selectedPort1Snac;
 	oldselectedPort2 <= selectedPort2Snac;

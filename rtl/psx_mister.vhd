@@ -255,6 +255,14 @@ entity psx_mister is
       selectedPort2Snac     : out std_logic;
       clk9Snac              : out std_logic;
       beginTransferSnac     : out std_logic;
+      
+      -- SNAC System Link interface
+      snac_txd              : out std_logic;
+      snac_rxd              : in  std_logic;
+      snac_rts              : out std_logic;
+      snac_cts              : in  std_logic;
+      snac_dtr              : out std_logic;
+      snac_dsr              : in  std_logic;
 		
       -- sound                          
       sound_out_left        : out std_logic_vector(15 downto 0) := (others => '0');
@@ -630,6 +638,14 @@ begin
       receiveValidSnac      => receiveValidSnac,
       ackSnac               => ackSnac,
       snacMC                => snacMC,
+      
+      -- SNAC System Link interface
+      snac_txd              => snac_txd,
+      snac_rxd              => snac_rxd,
+      snac_rts              => snac_rts,
+      snac_cts              => snac_cts,
+      snac_dtr              => snac_dtr,
+      snac_dsr              => snac_dsr,
 		
       -- sound              => -- sound       
       sound_out_left        => sound_out_left, 
