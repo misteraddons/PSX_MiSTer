@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep:*)",
+      "WebFetch(domain:psx-spx.consoledev.net)",
+      "Bash(find:*)",
+      "Bash(rg:*)",
+      "Bash(rm:*)"
+    ],
+    "deny": []
+  }
+}

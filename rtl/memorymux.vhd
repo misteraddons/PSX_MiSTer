@@ -337,7 +337,7 @@ begin
          bus_memc_write <= enableWrite;
       end if;
       
-      -- pad
+      -- pad (joypad USB translation)
       bus_pad_read      <= '0';
       bus_pad_write     <= '0';
       bus_pad_addr      <= address(3 downto 0);
@@ -348,7 +348,7 @@ begin
          bus_pad_write <= enableWrite;
       end if;
       
-      -- sio
+      -- sio (SIO1 system link)
       bus_sio_read      <= '0';
       bus_sio_write     <= '0';
       bus_sio_addr      <= address(3 downto 0);

@@ -210,6 +210,14 @@ entity psx_top is
       clk9Snac              : out std_logic;
       beginTransferSnac     : out std_logic;
 
+      -- SNAC System Link interface
+      snac_txd              : out std_logic;
+      snac_rxd              : in  std_logic;
+      snac_rts              : out std_logic;
+      snac_cts              : in  std_logic;
+      snac_dtr              : out std_logic;
+      snac_dsr              : in  std_logic;
+
       -- sound                            
       sound_out_left        : out std_logic_vector(15 downto 0) := (others => '0');
       sound_out_right       : out std_logic_vector(15 downto 0) := (others => '0');
@@ -1179,7 +1187,15 @@ begin
       SS_Adr               => SS_Adr(2 downto 0),      
       SS_wren              => SS_wren(11),     
       SS_rden              => SS_rden(11),     
-      SS_DataRead          => SS_DataRead_SIO
+      SS_DataRead          => SS_DataRead_SIO,
+      
+      -- SNAC System Link interface
+      snac_txd             => snac_txd,
+      snac_rxd             => snac_rxd,
+      snac_rts             => snac_rts,
+      snac_cts             => snac_cts,
+      snac_dtr             => snac_dtr,
+      snac_dsr             => snac_dsr
    );
    
    irq_SIO       <= '0'; -- todo

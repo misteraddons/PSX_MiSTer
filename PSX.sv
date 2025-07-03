@@ -375,6 +375,7 @@ parameter CONF_STR = {
 	"D8O[48:45],Pad1,Dualshock,Off,Digital,Analog,GunCon,NeGcon,Wheel-NegCon,Wheel-Analog,Mouse,Justifier,SNAC-port1,Analog Joystick,Pop'n;",
 	"D8O[52:49],Pad2,Dualshock,Off,Digital,Analog,GunCon,NeGcon,Wheel-NegCon,Wheel-Analog,Mouse,Justifier,SNAC-port2,Analog Joystick,Pop'n;",
 	"D8h0O[66],SNAC MemCard,Virtual,Real;",
+	"D8s0O[67],SNAC System Link,Off,On;",
 	"D8hFO[91],NeGcon Rumble,Off,On;",
 	"D8h2O[9],Show Crosshair,Off,On;",
 	"D8h4O[31],DS Mode,L3+R3+Up/Dn | Click,L1+L2+R1+R2+Up/Dn;",
@@ -876,6 +877,9 @@ wire snacPort2       = (status[52:49] == 4'b1010) && ~multitap;
 wire PadPortStick2   = (status[52:49] == 4'b1011);
 wire PadPortPopn2    = (status[52:49] == 4'b1100);
 
+// SNAC System Link
+wire snacSystemLink  = status[67];
+
 reg paddleMode = 0;
 reg paddleMin = 0;
 reg paddleMax = 0;
@@ -1291,6 +1295,14 @@ psx
    .receiveValidSnac(receiveValidSnac),
    .ackSnac(~ack),//using real ack not the 1 cycle ack
    .snacMC(status[66]),
+
+   // SNAC System Link interface
+   .snac_txd(snac_txd),
+   .snac_rxd(snac_rxd),
+   .snac_rts(snac_rts), 
+   .snac_cts(snac_cts),
+   .snac_dtr(snac_dtr),
+   .snac_dsr(snac_dsr),
 
    //sound
 	.sound_out_left(AUDIO_L),
@@ -1747,6 +1759,15 @@ wire receiveValidSnac;
 wire beginTransferSnac;
 wire actionNextSnac;
 wire actionNextPadSnac;
+
+// SNAC System Link signals
+wire snac_txd;
+wire snac_rxd;
+wire snac_rts;
+wire snac_cts;
+wire snac_dtr;
+wire snac_dsr;
+
 reg [7:0]Send;
 reg [7:0]Receive;
 wire Cmd;
@@ -1798,7 +1819,22 @@ begin
    USER_IN3_4 <= USER_IN3_3;
    ackglitch  <= ~USER_IN3_1 && ~USER_IN3_2 && ~USER_IN3_3 && ~USER_IN3_4 ? 1'b0 : 1'b1;
 
-	if (snacPort1 || snacPort2) begin
+	if (snacSystemLink) begin
+		// SNAC System Link mode - route SIO1 signals to SNAC connector
+		USER_OUT[0] <= ~snac_dtr;  // DTR output
+		USER_OUT[1] <= ~snac_rts;  // RTS output
+		USER_OUT[2] <= ~snac_txd;  // TXD output
+		USER_OUT[3] <= 1'b1;       // Set as input for CTS
+		USER_OUT[4] <= 1'b1;       // Set as input for RXD
+		USER_OUT[5] <= 1'b1;       // Set as input for DSR
+		USER_OUT[6] <= 1'b1;       // Unused in system link mode
+		
+		// Not used in system link mode
+		ack         <= 1'b1;       
+		Dat         <= 1'b1;       
+		irq10Snac   <= 1'b0;
+	end
+	else if (snacPort1 || snacPort2) begin
 		USER_OUT[0] <= ~selectedPort2Snac;
 		USER_OUT[1] <= ~selectedPort1Snac;
 		USER_OUT[2] <= Cmd;
@@ -1824,6 +1860,11 @@ begin
 		ack       <= 1'b1;
 		Dat       <= 1'b1;
 	end
+
+	// SNAC System Link input assignments
+	assign snac_rxd = snacSystemLink ? ~USER_IN[4] : 1'b1; // RXD input (inverted)
+	assign snac_cts = snacSystemLink ? ~USER_IN[3] : 1'b1; // CTS input (inverted)
+	assign snac_dsr = snacSystemLink ? ~USER_IN[5] : 1'b1; // DSR input (inverted)
 
 	oldselectedPort1 <= selectedPort1Snac;
 	oldselectedPort2 <= selectedPort2Snac;
