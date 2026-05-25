@@ -2026,13 +2026,13 @@ begin
    ackglitch  <= ~USER_IN3_1 && ~USER_IN3_2 && ~USER_IN3_3 && ~USER_IN3_4 ? 1'b0 : 1'b1;
 
 	if (userIoSystemLink) begin
-		// USER_IO system link mode. Use the USB3 SuperSpeed pairs for data.
-		USER_OUT[0] <= snac_rts | snac_dtr; // USB D+ output, crossed by cable to remote D-/handshake
-		USER_OUT[1] <= 1'b1;       // USB D- input from remote D+/RTS
-		USER_OUT[2] <= snac_txd;   // USB3 SSTX- output, crossed by cable to remote SSRX-/RXD
+		// USER_IO system link mode. Cross D+ to D-, SSTX+ to SSRX+, and SSTX- to SSRX-.
+		USER_OUT[0] <= snac_dtr;   // USB D+ output, crossed by cable to remote D-/DSR
+		USER_OUT[1] <= 1'b1;       // USB D- input from remote D+/DTR
+		USER_OUT[2] <= snac_rts;   // USB3 SSTX- output, crossed by cable to remote SSRX-/CTS
 		USER_OUT[3] <= 1'b1;       // Drain/release
 		USER_OUT[4] <= 1'b1;       // USB3 SSRX+ input from remote SSTX+/TXD
-		USER_OUT[5] <= 1'b1;       // USB3 SSRX- input from remote SSTX-/TXD
+		USER_OUT[5] <= 1'b1;       // USB3 SSRX- input from remote SSTX-/RTS
 		USER_OUT[6] <= snac_txd;   // USB3 SSTX+ output, crossed by cable to remote SSRX+/RXD
 		
 		// Not used in system link mode
@@ -2043,9 +2043,9 @@ begin
 `ifdef SYSTEM_LINK_DIAG_LOOPBACK
 		snac_rxd    <= snac_txd;
 `else
-		snac_rxd    <= USER_IN4_2 & USER_IN5_2;
+		snac_rxd    <= USER_IN4_2;
 `endif
-		snac_cts    <= USER_IN1_2;
+		snac_cts    <= USER_IN5_2;
 		snac_dsr    <= USER_IN1_2;
 	end
 	else if (snacPort1 || snacPort2) begin

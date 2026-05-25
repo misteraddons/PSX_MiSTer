@@ -350,6 +350,7 @@ architecture arch of psx_top is
    signal bus_sio_dataWrite      : std_logic_vector(31 downto 0);
    signal bus_sio_read           : std_logic;
    signal bus_sio_write          : std_logic;
+   signal bus_sio_reqsize        : unsigned(1 downto 0);
    signal bus_sio_writeMask      : std_logic_vector(3 downto 0);
    signal bus_sio_dataRead       : std_logic_vector(31 downto 0);
    signal bus_sio_raw_debug      : std_logic_vector(95 downto 0);
@@ -1181,6 +1182,7 @@ begin
       bus_dataWrite        => bus_sio_dataWrite,
       bus_read             => bus_sio_read,
       bus_write            => bus_sio_write,
+      bus_reqsize          => bus_sio_reqsize,
       bus_writeMask        => bus_sio_writeMask,
       bus_dataRead         => bus_sio_dataRead,
       irq                  => irq_SIO,
@@ -1800,8 +1802,9 @@ begin
       
       bus_sio_addr         => bus_sio_addr,     
       bus_sio_dataWrite    => bus_sio_dataWrite,
-      bus_sio_read         => bus_sio_read,     
-      bus_sio_write        => bus_sio_write,    
+      bus_sio_read         => bus_sio_read,
+      bus_sio_write        => bus_sio_write,
+      bus_sio_reqsize      => bus_sio_reqsize,
       bus_sio_writeMask    => bus_sio_writeMask,
       bus_sio_dataRead     => bus_sio_dataRead, 
       bus_sio_raw_debug    => bus_sio_raw_debug,

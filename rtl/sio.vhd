@@ -13,6 +13,7 @@ entity sio is
       bus_dataWrite        : in  std_logic_vector(31 downto 0);
       bus_read             : in  std_logic;
       bus_write            : in  std_logic;
+      bus_reqsize          : in  unsigned(1 downto 0);
       bus_writeMask        : in  std_logic_vector(3 downto 0);
       bus_dataRead         : out std_logic_vector(31 downto 0);
       irq                  : out std_logic;
@@ -51,6 +52,7 @@ architecture arch of sio is
    signal tx_shift         : std_logic_vector(9 downto 0) := (others => '1');
    signal tx_busy          : std_logic := '0';
    signal tx_pending       : std_logic := '0';
+   signal tx_start_seen    : std_logic := '0';
    signal tx_pending_data  : std_logic_vector(7 downto 0) := (others => '0');
    signal tx_pending_txen  : std_logic := '0';
    signal tx_bit_cnt       : unsigned(3 downto 0) := (others => '0');
@@ -71,6 +73,7 @@ architecture arch of sio is
    signal irq_pending      : std_logic := '0';
    signal tx_ready         : std_logic;
    signal tx_idle          : std_logic;
+   signal link_ready       : std_logic;
    signal rx_ready         : std_logic;
    signal debug_read_value : std_logic_vector(31 downto 0);
    signal debug_stat_raw   : std_logic_vector(31 downto 0);
@@ -178,6 +181,22 @@ architecture arch of sio is
       return result;
    end function;
 
+   function rx_pop_count(reqsize : unsigned(1 downto 0); count : unsigned(3 downto 0)) return unsigned is
+      variable wanted : unsigned(3 downto 0);
+   begin
+      case reqsize is
+         when "10" =>
+            wanted := to_unsigned(4, 4);
+         when others =>
+            wanted := to_unsigned(1, 4);
+      end case;
+
+      if count < wanted then
+         return count;
+      end if;
+      return wanted;
+   end function;
+
 begin
 
    snac_txd <= tx_line;
@@ -186,10 +205,11 @@ begin
    irq <= irq_pending;
 
    rx_ready <= '1' when rx_count /= 0 else '0';
-   tx_ready <= not tx_pending;
-   tx_idle  <= (not tx_busy) and (not tx_pending);
+   link_ready <= snac_cts or snac_dsr;
+   tx_ready <= tx_start_seen and (not tx_pending) and link_ready;
+   tx_idle  <= (not tx_busy) and (not tx_pending) and link_ready;
 
-   SIO_STAT_READ <= SIO_STAT(31 downto 10) & irq_pending & snac_cts & snac_dsr &
+   SIO_STAT_READ <= SIO_STAT(31 downto 10) & irq_pending & link_ready & snac_dsr &
                     SIO_STAT(6 downto 3) & tx_idle & rx_ready & tx_ready;
 
    debug_read_value <= rx_read_word(rx_fifo, rx_rd_ptr, rx_count, rx_data) when (bus_addr(3 downto 1) & '0') = x"0" else
@@ -223,6 +243,7 @@ begin
    ss_out(6)(2)            <= rx_ready;
    ss_out(6)(3)            <= irq_pending;
    ss_out(6)(4)            <= tx_pending;
+   ss_out(6)(5)            <= tx_start_seen;
 
    process (clk1x)
       variable data_v              : std_logic_vector(7 downto 0);
@@ -235,6 +256,7 @@ begin
       variable tx_shift_v          : std_logic_vector(9 downto 0);
       variable tx_busy_v           : std_logic;
       variable tx_pending_v        : std_logic;
+      variable tx_start_seen_v     : std_logic;
       variable tx_pending_data_v   : std_logic_vector(7 downto 0);
       variable tx_pending_txen_v   : std_logic;
       variable tx_bit_cnt_v        : unsigned(3 downto 0);
@@ -250,6 +272,7 @@ begin
       variable rx_wr_ptr_v         : unsigned(2 downto 0);
       variable rx_count_v          : unsigned(3 downto 0);
       variable rx_last_ptr_v       : unsigned(2 downto 0);
+      variable rx_pop_v            : unsigned(3 downto 0);
       variable ctrl_write_v        : std_logic;
       variable tx_start_v          : std_logic;
       variable read_word_v         : std_logic_vector(31 downto 0);
@@ -267,6 +290,7 @@ begin
             tx_shift       <= (others => '1');
             tx_busy        <= '0';
             tx_pending     <= '0';
+            tx_start_seen  <= '1';
             tx_pending_data <= (others => '0');
             tx_pending_txen <= '0';
             tx_bit_cnt     <= (others => '0');
@@ -313,6 +337,7 @@ begin
                   rx_busy <= SS_DataWrite(1);
                   irq_pending <= SS_DataWrite(3);
                   tx_pending <= SS_DataWrite(4);
+                  tx_start_seen <= SS_DataWrite(5);
                when others => null;
             end case;
          elsif (ce = '1') then
@@ -326,6 +351,7 @@ begin
             tx_shift_v := tx_shift;
             tx_busy_v := tx_busy;
             tx_pending_v := tx_pending;
+            tx_start_seen_v := tx_start_seen;
             tx_pending_data_v := tx_pending_data;
             tx_pending_txen_v := tx_pending_txen;
             tx_bit_cnt_v := tx_bit_cnt;
@@ -354,8 +380,9 @@ begin
                      bus_dataRead <= read_word_v;
                      if rx_count_v /= 0 then
                         rx_data_v := rx_fifo_v(to_integer(rx_rd_ptr_v));
-                        rx_rd_ptr_v := rx_rd_ptr_v + 1;
-                        rx_count_v := rx_count_v - 1;
+                        rx_pop_v := rx_pop_count(bus_reqsize, rx_count_v);
+                        rx_rd_ptr_v := rx_rd_ptr_v + resize(rx_pop_v(2 downto 0), 3);
+                        rx_count_v := rx_count_v - rx_pop_v;
                      end if;
                   when x"4" =>
                      if rx_count_v = 0 then
@@ -363,11 +390,11 @@ begin
                      else
                         rx_ready_v := '1';
                      end if;
-                     status_read_v := stat_v(31 downto 10) & irq_v & snac_cts & snac_dsr &
+                     status_read_v := stat_v(31 downto 10) & irq_v & (snac_cts or snac_dsr) & snac_dsr &
                                       stat_v(6 downto 3) &
-                                      ((not tx_busy_v) and (not tx_pending_v)) &
+                                      ((not tx_busy_v) and (not tx_pending_v) and (snac_cts or snac_dsr)) &
                                       rx_ready_v &
-                                      (not tx_pending_v);
+                                      (tx_start_seen_v and (not tx_pending_v) and (snac_cts or snac_dsr));
                      bus_dataRead <= status_read_v;
                   when x"8" =>
                      bus_dataRead <= ctrl_v & mode_v;
@@ -389,9 +416,10 @@ begin
                         data_v := bus_dataWrite(7 downto 0);
                         tx_pending_data_v := bus_dataWrite(7 downto 0);
                         tx_pending_txen_v := ctrl_v(0);
+                        tx_start_seen_v := '0';
                         debug_data_write <= '1';
                         debug_tx_latched <= ctrl_v(0);
-                        if tx_busy_v = '0' and snac_cts = '1' and ctrl_v(0) = '1' then
+                        if tx_busy_v = '0' and (snac_cts = '1' or snac_dsr = '1') and ctrl_v(0) = '1' then
                            tx_shift_v := "11" & bus_dataWrite(7 downto 0);
                            tx_busy_v := '1';
                            tx_pending_v := '0';
@@ -451,6 +479,7 @@ begin
                   baud_v := x"00DC";
                   tx_shift_v := (others => '1');
                   tx_busy_v := '0';
+                  tx_start_seen_v := '1';
                   tx_pending_v := '0';
                   tx_pending_data_v := (others => '0');
                   tx_pending_txen_v := '0';
@@ -485,7 +514,7 @@ begin
                end if;
             end if;
 
-            if tx_busy_v = '0' and tx_pending_v = '1' and snac_cts = '1' and (ctrl_v(0) = '1' or tx_pending_txen_v = '1') then
+            if tx_busy_v = '0' and tx_pending_v = '1' and (snac_cts = '1' or snac_dsr = '1') and (ctrl_v(0) = '1' or tx_pending_txen_v = '1') then
                data_v := tx_pending_data_v;
                tx_shift_v := "11" & tx_pending_data_v;
                tx_busy_v := '1';
@@ -498,11 +527,12 @@ begin
 
             if tx_busy_v = '1' and tx_start_v = '0' then
                if tx_div_v = 0 then
+                  tx_start_seen_v := '1';
                   tx_line_v := tx_shift_v(0);
                   tx_shift_v := '1' & tx_shift_v(9 downto 1);
                   tx_div_v := baud_reload(baud_v, mode_v(1 downto 0));
                   if tx_bit_cnt_v = 1 then
-                     if tx_pending_v = '1' and snac_cts = '1' and (ctrl_v(0) = '1' or tx_pending_txen_v = '1') then
+                     if tx_pending_v = '1' and (snac_cts = '1' or snac_dsr = '1') and (ctrl_v(0) = '1' or tx_pending_txen_v = '1') then
                         data_v := tx_pending_data_v;
                         tx_shift_v := "11" & tx_pending_data_v;
                         tx_busy_v := '1';
@@ -516,7 +546,7 @@ begin
                         tx_line_v := '1';
                      end if;
 
-                     if ctrl_v(10) = '1' then
+                     if ctrl_v(10) = '1' and tx_pending_v = '0' and (snac_cts = '1' or snac_dsr = '1') then
                         irq_v := '1';
                      end if;
                   else
@@ -574,7 +604,7 @@ begin
                irq_v := '1';
             end if;
 
-            if ctrl_v(10) = '1' and tx_pending_v = '0' then
+            if ctrl_v(10) = '1' and tx_start_seen_v = '1' and tx_pending_v = '0' and (snac_cts = '1' or snac_dsr = '1') then
                irq_v := '1';
             end if;
 
@@ -592,6 +622,7 @@ begin
             tx_shift <= tx_shift_v;
             tx_busy <= tx_busy_v;
             tx_pending <= tx_pending_v;
+            tx_start_seen <= tx_start_seen_v;
             tx_pending_data <= tx_pending_data_v;
             tx_pending_txen <= tx_pending_txen_v;
             tx_bit_cnt <= tx_bit_cnt_v;

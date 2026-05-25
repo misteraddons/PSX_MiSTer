@@ -78,6 +78,7 @@ entity memorymux is
       bus_sio_dataWrite    : out std_logic_vector(31 downto 0);
       bus_sio_read         : out std_logic;
       bus_sio_write        : out std_logic;
+      bus_sio_reqsize      : out unsigned(1 downto 0);
       bus_sio_writeMask    : out std_logic_vector(3 downto 0);
       bus_sio_dataRead     : in  std_logic_vector(31 downto 0);
       bus_sio_raw_debug    : out std_logic_vector(95 downto 0);
@@ -354,6 +355,7 @@ begin
       bus_sio_write     <= '0';
       bus_sio_addr      <= address(3 downto 0);
       bus_sio_dataWrite <= dataWrite_buf;
+      bus_sio_reqsize   <= reqsize_buf;
       bus_sio_writeMask <= writeMask_buf;
       bus_sio_raw_debug <= (others => '0');
       bus_sio_raw_debug(28 downto 0) <= std_logic_vector(address);
