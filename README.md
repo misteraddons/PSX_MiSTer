@@ -161,6 +161,27 @@ The following pad types are emulated by the core and can be independently assign
 SNAC can be selected for each port and will support gamepads and memory cards on the corresponding slot.
 When SNAC is enabled for a slot, the emulated gamepad/memory for this slot is disconnected.
 
+## USER_IO system link
+
+System Link uses the MiSTer USER_IO port for MiSTer-to-MiSTer PlayStation SIO1 multiplayer. This mode is not wired for a real PlayStation serial cable.
+
+The current v1 uses a custom USB3 breakout cable between two MiSTers. It crosses
+the USB3 SuperSpeed pairs for TX/RX data and crosses D+/D- for the RTS/CTS
+handshake.
+
+| USB3 cable signal | Direction | SIO use |
+|:------------------|:----------|:--------|
+| SSTX+/SSTX-       | A to B SSRX+/SSRX- | TXD to remote RXD |
+| SSRX+/SSRX-       | B SSTX+/SSTX- to A | RXD from remote TXD |
+| D+                | crossed to remote D- | RTS to remote CTS |
+| D-                | crossed from remote D+ | CTS from remote RTS |
+| GND               | shared | ground |
+
+USER_IO lines are open-drain: logic high is released, logic low is actively
+pulled down.
+v1 uses D+/D- as an RTS/CTS crossover and straps SIO1 DSR ready inside the
+core. The USB3 SuperSpeed pairs carry serial TX/RX data.
+
 ## Controller mapping reference
 NeGcon based controllers
 

@@ -375,7 +375,7 @@ parameter CONF_STR = {
 	"D8O[48:45],Pad1,Dualshock,Off,Digital,Analog,GunCon,NeGcon,Wheel-NegCon,Wheel-Analog,Mouse,Justifier,SNAC-port1,Analog Joystick,Pop'n;",
 	"D8O[52:49],Pad2,Dualshock,Off,Digital,Analog,GunCon,NeGcon,Wheel-NegCon,Wheel-Analog,Mouse,Justifier,SNAC-port2,Analog Joystick,Pop'n;",
 	"D8h0O[66],SNAC MemCard,Virtual,Real;",
-	"D8s0O[67],SNAC System Link,Off,On;",
+	"O[92],System Link,Off,USER_IO;",
 	"D8hFO[91],NeGcon Rumble,Off,On;",
 	"D8h2O[9],Show Crosshair,Off,On;",
 	"D8h4O[31],DS Mode,L3+R3+Up/Dn | Click,L1+L2+R1+R2+Up/Dn;",
@@ -877,8 +877,8 @@ wire snacPort2       = (status[52:49] == 4'b1010) && ~multitap;
 wire PadPortStick2   = (status[52:49] == 4'b1011);
 wire PadPortPopn2    = (status[52:49] == 4'b1100);
 
-// SNAC System Link
-wire snacSystemLink  = status[67];
+// USER_IO System Link
+wire userIoSystemLink = status[92];
 
 reg paddleMode = 0;
 reg paddleMin = 0;
@@ -1299,10 +1299,12 @@ psx
    // SNAC System Link interface
    .snac_txd(snac_txd),
    .snac_rxd(snac_rxd),
-   .snac_rts(snac_rts), 
+   .snac_rts(snac_rts),
    .snac_cts(snac_cts),
    .snac_dtr(snac_dtr),
    .snac_dsr(snac_dsr),
+   .sio_debug_bus(sio_debug_bus),
+   .sio_raw_debug_bus(sio_raw_debug_bus),
 
    //sound
 	.sound_out_left(AUDIO_L),
@@ -1760,13 +1762,205 @@ wire beginTransferSnac;
 wire actionNextSnac;
 wire actionNextPadSnac;
 
-// SNAC System Link signals
+// USER_IO System Link signals
 wire snac_txd;
 reg snac_rxd;
 wire snac_rts;
 reg snac_cts;
 wire snac_dtr;
 reg snac_dsr;
+wire [255:0] sio_debug_bus;
+wire [95:0] sio_raw_debug_bus;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [63:0] dbg_syslink_bus;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_mode;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_txd;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_rxd;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_user_tx;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_user_rx;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_tx_busy;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_rx_busy;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_rx_ready;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_irq;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_rts;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_cts;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_dtr;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_dsr;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_uart_rx;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_bus_read;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_bus_write;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [3:0] dbg_syslink_bus_addr;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [7:0] dbg_syslink_bus_wdata;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [7:0] dbg_syslink_rx_data;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_bus_write_seen;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_bus_read_seen;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_data_write_seen;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [7:0] dbg_syslink_write_count;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [7:0] dbg_syslink_read_count;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [3:0] dbg_syslink_last_write_addr;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [7:0] dbg_syslink_last_write_data;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [7:0] dbg_syslink_write_data_count;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [7:0] dbg_syslink_write_stat_count;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [7:0] dbg_syslink_write_ctrl_count;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [7:0] dbg_syslink_write_baud_count;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [7:0] dbg_syslink_read_data_count;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [7:0] dbg_syslink_read_stat_count;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [7:0] dbg_syslink_read_ctrl_count;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [7:0] dbg_syslink_read_baud_count;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [31:0] dbg_syslink_stat_value;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [15:0] dbg_syslink_ctrl_value;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [15:0] dbg_syslink_mode_value;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [15:0] dbg_syslink_baud_value;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [31:0] dbg_syslink_bus_wdata_full;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [3:0] dbg_syslink_bus_write_mask;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [31:0] dbg_syslink_bus_rdata;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [31:0] dbg_syslink_stat_raw;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [7:0] dbg_syslink_sio_data;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_decoded_data_write;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_txen_latched;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [7:0] dbg_syslink_write_data_raw_count;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_raw_window;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_raw_read;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_raw_write;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [28:0] dbg_syslink_raw_addr;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [31:0] dbg_syslink_raw_wdata;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [3:0] dbg_syslink_raw_write_mask;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [7:0] dbg_syslink_raw_write_count;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [7:0] dbg_syslink_raw_data_write_count;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [3:0] dbg_syslink_last_read_addr;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [31:0] dbg_syslink_last_read_data;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [31:0] dbg_syslink_last_write_word;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_data_write_delayed_trigger;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [9:0] dbg_syslink_data_write_trigger_delay;
+always @(posedge clk_1x) begin
+	dbg_syslink_mode <= userIoSystemLink;
+	dbg_syslink_txd <= snac_txd;
+	dbg_syslink_rxd <= snac_rxd;
+	dbg_syslink_user_tx <= snac_txd;
+	dbg_syslink_user_rx <= snac_rxd;
+	dbg_syslink_tx_busy <= sio_debug_bus[0];
+	dbg_syslink_rx_busy <= sio_debug_bus[1];
+	dbg_syslink_rx_ready <= sio_debug_bus[2];
+	dbg_syslink_irq <= sio_debug_bus[3];
+	dbg_syslink_rts <= snac_rts;
+	dbg_syslink_cts <= snac_cts;
+	dbg_syslink_dtr <= snac_dtr;
+	dbg_syslink_dsr <= snac_dsr;
+	dbg_syslink_uart_rx <= sio_debug_bus[5];
+	dbg_syslink_bus_read <= sio_debug_bus[6];
+	dbg_syslink_bus_write <= sio_debug_bus[7];
+	dbg_syslink_bus_addr <= sio_debug_bus[11:8];
+	dbg_syslink_bus_wdata <= sio_debug_bus[19:12];
+	dbg_syslink_rx_data <= sio_debug_bus[27:20];
+	dbg_syslink_stat_value <= sio_debug_bus[59:28];
+	dbg_syslink_ctrl_value <= sio_debug_bus[75:60];
+	dbg_syslink_mode_value <= sio_debug_bus[91:76];
+	dbg_syslink_baud_value <= sio_debug_bus[107:92];
+	dbg_syslink_bus_wdata_full <= sio_debug_bus[139:108];
+	dbg_syslink_bus_write_mask <= sio_debug_bus[143:140];
+	dbg_syslink_bus_rdata <= sio_debug_bus[175:144];
+	dbg_syslink_stat_raw <= sio_debug_bus[207:176];
+	dbg_syslink_sio_data <= sio_debug_bus[215:208];
+	dbg_syslink_decoded_data_write <= sio_debug_bus[224];
+	dbg_syslink_txen_latched <= sio_debug_bus[225];
+	dbg_syslink_raw_addr <= sio_raw_debug_bus[28:0];
+	dbg_syslink_raw_wdata <= sio_raw_debug_bus[60:29];
+	dbg_syslink_raw_write_mask <= sio_raw_debug_bus[64:61];
+	dbg_syslink_raw_read <= sio_raw_debug_bus[65];
+	dbg_syslink_raw_write <= sio_raw_debug_bus[66];
+	dbg_syslink_raw_window <= sio_raw_debug_bus[67];
+
+	if (!userIoSystemLink) begin
+		dbg_syslink_bus_write_seen <= 1'b0;
+		dbg_syslink_bus_read_seen <= 1'b0;
+		dbg_syslink_data_write_seen <= 1'b0;
+		dbg_syslink_write_count <= 8'd0;
+		dbg_syslink_read_count <= 8'd0;
+		dbg_syslink_last_write_addr <= 4'd0;
+		dbg_syslink_last_write_data <= 8'd0;
+		dbg_syslink_write_data_count <= 8'd0;
+		dbg_syslink_write_stat_count <= 8'd0;
+		dbg_syslink_write_ctrl_count <= 8'd0;
+		dbg_syslink_write_baud_count <= 8'd0;
+		dbg_syslink_read_data_count <= 8'd0;
+		dbg_syslink_read_stat_count <= 8'd0;
+		dbg_syslink_read_ctrl_count <= 8'd0;
+		dbg_syslink_read_baud_count <= 8'd0;
+		dbg_syslink_write_data_raw_count <= 8'd0;
+		dbg_syslink_raw_write_count <= 8'd0;
+		dbg_syslink_raw_data_write_count <= 8'd0;
+		dbg_syslink_last_read_addr <= 4'd0;
+		dbg_syslink_last_read_data <= 32'd0;
+		dbg_syslink_last_write_word <= 32'd0;
+		dbg_syslink_data_write_delayed_trigger <= 1'b0;
+		dbg_syslink_data_write_trigger_delay <= 10'd0;
+	end else begin
+		dbg_syslink_data_write_delayed_trigger <= 1'b0;
+		if (sio_raw_debug_bus[66]) begin
+			dbg_syslink_raw_write_count <= dbg_syslink_raw_write_count + 8'd1;
+			if (sio_raw_debug_bus[3:0] == 4'h0) begin
+				dbg_syslink_raw_data_write_count <= dbg_syslink_raw_data_write_count + 8'd1;
+			end
+		end
+		if (sio_debug_bus[7]) begin
+			dbg_syslink_bus_write_seen <= 1'b1;
+			dbg_syslink_write_count <= dbg_syslink_write_count + 8'd1;
+			dbg_syslink_last_write_addr <= sio_debug_bus[11:8];
+			dbg_syslink_last_write_data <= sio_debug_bus[19:12];
+			dbg_syslink_last_write_word <= sio_debug_bus[139:108];
+			case (sio_debug_bus[11:10])
+				2'b00: begin
+					dbg_syslink_write_data_count <= dbg_syslink_write_data_count + 8'd1;
+					dbg_syslink_data_write_seen <= 1'b1;
+				end
+				2'b01: dbg_syslink_write_stat_count <= dbg_syslink_write_stat_count + 8'd1;
+				2'b10: dbg_syslink_write_ctrl_count <= dbg_syslink_write_ctrl_count + 8'd1;
+				2'b11: dbg_syslink_write_baud_count <= dbg_syslink_write_baud_count + 8'd1;
+			endcase
+		end
+		if (sio_debug_bus[224]) begin
+			dbg_syslink_write_data_raw_count <= dbg_syslink_write_data_raw_count + 8'd1;
+			dbg_syslink_data_write_trigger_delay <= 10'd512;
+		end else if (dbg_syslink_data_write_trigger_delay != 10'd0) begin
+			dbg_syslink_data_write_trigger_delay <= dbg_syslink_data_write_trigger_delay - 10'd1;
+			if (dbg_syslink_data_write_trigger_delay == 10'd1) begin
+				dbg_syslink_data_write_delayed_trigger <= 1'b1;
+			end
+		end
+		if (sio_debug_bus[6]) begin
+			dbg_syslink_bus_read_seen <= 1'b1;
+			dbg_syslink_read_count <= dbg_syslink_read_count + 8'd1;
+			dbg_syslink_last_read_addr <= sio_debug_bus[11:8];
+			dbg_syslink_last_read_data <= sio_debug_bus[175:144];
+			case (sio_debug_bus[11:10])
+				2'b00: dbg_syslink_read_data_count <= dbg_syslink_read_data_count + 8'd1;
+				2'b01: dbg_syslink_read_stat_count <= dbg_syslink_read_stat_count + 8'd1;
+				2'b10: dbg_syslink_read_ctrl_count <= dbg_syslink_read_ctrl_count + 8'd1;
+				2'b11: dbg_syslink_read_baud_count <= dbg_syslink_read_baud_count + 8'd1;
+			endcase
+		end
+	end
+
+	dbg_syslink_bus <= 64'd0;
+	dbg_syslink_bus[0] <= dbg_syslink_mode;
+	dbg_syslink_bus[1] <= dbg_syslink_txd;
+	dbg_syslink_bus[2] <= dbg_syslink_rxd;
+	dbg_syslink_bus[3] <= snac_cts;
+	dbg_syslink_bus[4] <= snac_dsr;
+	dbg_syslink_bus[5] <= dbg_syslink_user_tx;
+	dbg_syslink_bus[6] <= dbg_syslink_user_rx;
+	dbg_syslink_bus[7] <= dbg_syslink_rts;
+	dbg_syslink_bus[8] <= dbg_syslink_cts;
+	dbg_syslink_bus[9] <= dbg_syslink_dtr;
+	dbg_syslink_bus[10] <= dbg_syslink_dsr;
+	dbg_syslink_bus[39:32] <= sio_debug_bus[7:0];
+	dbg_syslink_bus[43:40] <= sio_debug_bus[11:8];
+	dbg_syslink_bus[51:44] <= sio_debug_bus[19:12];
+	dbg_syslink_bus[59:52] <= sio_debug_bus[27:20];
+	dbg_syslink_bus[60] <= dbg_syslink_bus_write_seen;
+	dbg_syslink_bus[61] <= dbg_syslink_bus_read_seen;
+	dbg_syslink_bus[62] <= dbg_syslink_data_write_seen;
+	dbg_syslink_bus[63] <= dbg_syslink_decoded_data_write;
+end
 
 reg [7:0]Send;
 reg [7:0]Receive;
@@ -1790,12 +1984,18 @@ wire MCtransfer;
 wire PStransfer;
 wire [7:0]PSdatalength;
 
+reg USER_IN0_1;
+reg USER_IN1_1;
 reg USER_IN3_1;
 reg USER_IN4_1;
+reg USER_IN5_1;
 reg USER_IN6_1;
 
+reg USER_IN0_2;
+reg USER_IN1_2;
 reg USER_IN3_2;
 reg USER_IN4_2;
+reg USER_IN5_2;
 reg USER_IN6_2;
 
 reg USER_IN3_3;
@@ -1807,37 +2007,46 @@ assign clk8Snac = bitCnt < 8 ? clk9Snac : 1'b1;
 always @(posedge clk_1x)
 begin
 
+   USER_IN0_1 <= USER_IN[0];
+   USER_IN1_1 <= USER_IN[1];
    USER_IN3_1 <= USER_IN[3];
    USER_IN4_1 <= USER_IN[4];
+   USER_IN5_1 <= USER_IN[5];
    USER_IN6_1 <= USER_IN[6];
 
+   USER_IN0_2 <= USER_IN0_1;
+   USER_IN1_2 <= USER_IN1_1;
    USER_IN3_2 <= USER_IN3_1;
    USER_IN4_2 <= USER_IN4_1;
+   USER_IN5_2 <= USER_IN5_1;
    USER_IN6_2 <= USER_IN6_1;
 
    USER_IN3_3 <= USER_IN3_2;//glitch filter for ack
    USER_IN3_4 <= USER_IN3_3;
    ackglitch  <= ~USER_IN3_1 && ~USER_IN3_2 && ~USER_IN3_3 && ~USER_IN3_4 ? 1'b0 : 1'b1;
 
-	if (snacSystemLink) begin
-		// SNAC System Link mode - route SIO1 signals to SNAC connector
-		USER_OUT[0] <= ~snac_dtr;  // DTR output
-		USER_OUT[1] <= ~snac_rts;  // RTS output
-		USER_OUT[2] <= ~snac_txd;  // TXD output
-		USER_OUT[3] <= 1'b1;       // Set as input for CTS
-		USER_OUT[4] <= 1'b1;       // Set as input for RXD
-		USER_OUT[5] <= 1'b1;       // Set as input for DSR
-		USER_OUT[6] <= 1'b1;       // Unused in system link mode
+	if (userIoSystemLink) begin
+		// USER_IO system link mode. Use the USB3 SuperSpeed pairs for data.
+		USER_OUT[0] <= snac_rts | snac_dtr; // USB D+ output, crossed by cable to remote D-/handshake
+		USER_OUT[1] <= 1'b1;       // USB D- input from remote D+/RTS
+		USER_OUT[2] <= snac_txd;   // USB3 SSTX- output, crossed by cable to remote SSRX-/RXD
+		USER_OUT[3] <= 1'b1;       // Drain/release
+		USER_OUT[4] <= 1'b1;       // USB3 SSRX+ input from remote SSTX+/TXD
+		USER_OUT[5] <= 1'b1;       // USB3 SSRX- input from remote SSTX-/TXD
+		USER_OUT[6] <= snac_txd;   // USB3 SSTX+ output, crossed by cable to remote SSRX+/RXD
 		
 		// Not used in system link mode
 		ack         <= 1'b1;       
 		Dat         <= 1'b1;       
 		irq10Snac   <= 1'b0;
 		
-		// SNAC System Link input assignments
-		snac_rxd    <= ~USER_IN[4]; // RXD input (inverted)
-		snac_cts    <= ~USER_IN[3]; // CTS input (inverted)
-		snac_dsr    <= ~USER_IN[5]; // DSR input (inverted)
+`ifdef SYSTEM_LINK_DIAG_LOOPBACK
+		snac_rxd    <= snac_txd;
+`else
+		snac_rxd    <= USER_IN4_2 & USER_IN5_2;
+`endif
+		snac_cts    <= USER_IN1_2;
+		snac_dsr    <= USER_IN1_2;
 	end
 	else if (snacPort1 || snacPort2) begin
 		USER_OUT[0] <= ~selectedPort2Snac;

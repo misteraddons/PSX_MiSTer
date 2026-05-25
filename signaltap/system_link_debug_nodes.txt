@@ -1,0 +1,47 @@
+Prefer these named nodes in SignalTap:
+
+dbg_syslink_mode      - System Link USER_IO mode enabled
+dbg_syslink_txd       - SIO TX line
+dbg_syslink_rxd       - SIO RX line after USER_IO sampling
+dbg_syslink_user_tx   - USER_OUT[2]/USER_OUT[6] TX drive signal
+dbg_syslink_user_rx   - Combined USER_IN[5]/USER_IN[4] RX sample
+dbg_syslink_tx_busy   - SIO TX busy
+dbg_syslink_rx_busy   - SIO RX busy
+dbg_syslink_rx_ready  - SIO RX ready
+dbg_syslink_irq       - SIO IRQ pending
+dbg_syslink_rts       - SIO RTS output
+dbg_syslink_cts       - SIO CTS input as seen by SIO status
+dbg_syslink_dtr       - SIO DTR output
+dbg_syslink_dsr       - SIO DSR input as seen by SIO status
+dbg_syslink_uart_rx   - SIO RX line into UART
+dbg_syslink_bus_read  - SIO bus read
+dbg_syslink_bus_write - SIO bus write
+dbg_syslink_bus_addr  - SIO bus address
+dbg_syslink_bus_wdata - SIO bus write data
+dbg_syslink_rx_data   - SIO RX data
+dbg_syslink_bus_write_seen - Sticky SIO bus write seen flag
+dbg_syslink_bus_read_seen  - Sticky SIO bus read seen flag
+dbg_syslink_data_write_seen - Sticky SIO data-register write seen flag
+dbg_syslink_write_count - SIO bus write counter
+dbg_syslink_read_count  - SIO bus read counter
+dbg_syslink_last_write_addr - Last SIO write address
+dbg_syslink_last_write_data - Last SIO write data
+dbg_syslink_write_data_count - SIO write count for data register group 0x0-0x3
+dbg_syslink_write_stat_count - SIO write count for status register group 0x4-0x7
+dbg_syslink_write_ctrl_count - SIO write count for mode/control group 0x8-0xB
+dbg_syslink_write_baud_count - SIO write count for baud group 0xC-0xF
+dbg_syslink_read_data_count  - SIO read count for data register group 0x0-0x3
+dbg_syslink_read_stat_count  - SIO read count for status register group 0x4-0x7
+dbg_syslink_read_ctrl_count  - SIO read count for mode/control group 0x8-0xB
+dbg_syslink_read_baud_count  - SIO read count for baud group 0xC-0xF
+dbg_syslink_stat_value       - Current SIO status value returned at 1F801054
+dbg_syslink_ctrl_value       - Current SIO control register
+dbg_syslink_mode_value       - Current SIO mode register
+dbg_syslink_baud_value       - Current SIO baud register
+dbg_syslink_bus_write_mask   - Current SIO bus write mask
+dbg_syslink_last_read_addr   - Last SIO read address
+dbg_syslink_last_read_data   - Last SIO read value
+dbg_syslink_last_write_word  - Last full 32-bit SIO write value
+
+The packed dbg_syslink_bus remains available as a fallback, but Quartus may rename
+or collapse individual bus bits into feeder nodes.

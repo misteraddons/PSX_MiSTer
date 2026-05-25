@@ -80,6 +80,7 @@ entity memorymux is
       bus_sio_write        : out std_logic;
       bus_sio_writeMask    : out std_logic_vector(3 downto 0);
       bus_sio_dataRead     : in  std_logic_vector(31 downto 0);
+      bus_sio_raw_debug    : out std_logic_vector(95 downto 0);
       
       bus_memc2_addr       : out unsigned(3 downto 0); 
       bus_memc2_dataWrite  : out std_logic_vector(31 downto 0);
@@ -354,9 +355,16 @@ begin
       bus_sio_addr      <= address(3 downto 0);
       bus_sio_dataWrite <= dataWrite_buf;
       bus_sio_writeMask <= writeMask_buf;
+      bus_sio_raw_debug <= (others => '0');
+      bus_sio_raw_debug(28 downto 0) <= std_logic_vector(address);
+      bus_sio_raw_debug(60 downto 29) <= dataWrite_buf;
+      bus_sio_raw_debug(64 downto 61) <= writeMask_buf;
       if (address >= 16#1F801050# and address < 16#1F801060#) then
          bus_sio_read  <= enableRead;
          bus_sio_write <= enableWrite;
+         bus_sio_raw_debug(65) <= enableRead;
+         bus_sio_raw_debug(66) <= enableWrite;
+         bus_sio_raw_debug(67) <= '1';
       end if;
       
       -- memc2

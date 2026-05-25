@@ -217,6 +217,8 @@ entity psx_top is
       snac_cts              : in  std_logic;
       snac_dtr              : out std_logic;
       snac_dsr              : in  std_logic;
+      sio_debug_bus         : out std_logic_vector(255 downto 0);
+      sio_raw_debug_bus     : out std_logic_vector(95 downto 0);
 
       -- sound                            
       sound_out_left        : out std_logic_vector(15 downto 0) := (others => '0');
@@ -350,6 +352,7 @@ architecture arch of psx_top is
    signal bus_sio_write          : std_logic;
    signal bus_sio_writeMask      : std_logic_vector(3 downto 0);
    signal bus_sio_dataRead       : std_logic_vector(31 downto 0);
+   signal bus_sio_raw_debug      : std_logic_vector(95 downto 0);
    
    signal bus_memc2_addr         : unsigned(3 downto 0); 
    signal bus_memc2_dataWrite    : std_logic_vector(31 downto 0);
@@ -1176,10 +1179,11 @@ begin
       
       bus_addr             => bus_sio_addr,     
       bus_dataWrite        => bus_sio_dataWrite,
-      bus_read             => bus_sio_read,     
-      bus_write            => bus_sio_write,    
+      bus_read             => bus_sio_read,
+      bus_write            => bus_sio_write,
       bus_writeMask        => bus_sio_writeMask,
       bus_dataRead         => bus_sio_dataRead,
+      irq                  => irq_SIO,
       
       loading_savestate    => loading_savestate,
       SS_reset             => SS_reset,
@@ -1195,10 +1199,10 @@ begin
       snac_rts             => snac_rts,
       snac_cts             => snac_cts,
       snac_dtr             => snac_dtr,
-      snac_dsr             => snac_dsr
+      snac_dsr             => snac_dsr,
+      debug_bus            => sio_debug_bus
    );
-   
-   irq_SIO       <= '0'; -- todo
+
    irq_LIGHTPEN  <= '1' when
                     (irq10Snac = '1' and snacport1 = '1') or
                     (irq10Snac = '1' and snacport2 = '1') or
@@ -1800,6 +1804,7 @@ begin
       bus_sio_write        => bus_sio_write,    
       bus_sio_writeMask    => bus_sio_writeMask,
       bus_sio_dataRead     => bus_sio_dataRead, 
+      bus_sio_raw_debug    => bus_sio_raw_debug,
 
       bus_memc2_addr       => bus_memc2_addr,     
       bus_memc2_dataWrite  => bus_memc2_dataWrite,
@@ -1877,6 +1882,8 @@ begin
       SS_wren_SDRam        => SS_wren(16),
       SS_rden_SDRam        => SS_rden(16)
    );
+
+   sio_raw_debug_bus <= bus_sio_raw_debug;
    
    icpu : entity work.cpu
    port map
