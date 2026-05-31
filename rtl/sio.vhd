@@ -91,7 +91,6 @@ architecture arch of sio is
    signal debug_tx_latched : std_logic := '0';
    signal effective_cts    : std_logic;
    signal effective_dsr    : std_logic;
-   signal status_link_ready : std_logic;
    signal assist_configured : std_logic;
    signal assist_edge_active : std_logic;
    signal assist_state     : unsigned(1 downto 0) := (others => '0');
@@ -285,12 +284,11 @@ begin
                     snac_dsr when assist_state = "11" else
                     '1' when link_assist_mode = "11" and assist_state = "10" else
                     '0';
-   status_link_ready <= effective_cts or effective_dsr;
-   link_ready <= status_link_ready;
+   link_ready <= effective_cts;
    tx_ready <= tx_start_seen and (not tx_pending) and effective_cts;
    tx_idle  <= (not tx_busy) and (not tx_pending) and effective_cts;
 
-   SIO_STAT_READ <= SIO_STAT(31 downto 10) & irq_pending & status_link_ready & effective_dsr &
+   SIO_STAT_READ <= SIO_STAT(31 downto 10) & irq_pending & effective_cts & effective_dsr &
                     SIO_STAT(6 downto 3) & tx_idle & rx_ready & tx_ready;
 
    debug_read_value <= rx_read_word(rx_fifo, rx_rd_ptr, rx_count, rx_data) when (bus_addr(3 downto 1) & '0') = x"0" else
@@ -552,7 +550,7 @@ begin
                      else
                         rx_ready_v := '1';
                      end if;
-                     status_read_v := stat_v(31 downto 10) & irq_v & status_link_ready & effective_dsr &
+                     status_read_v := stat_v(31 downto 10) & irq_v & effective_cts & effective_dsr &
                                       stat_v(6 downto 3) &
                                       ((not tx_busy_v) and (not tx_pending_v) and effective_cts) &
                                       rx_ready_v &
