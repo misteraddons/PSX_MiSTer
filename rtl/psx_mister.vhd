@@ -263,6 +263,7 @@ entity psx_mister is
       snac_cts              : in  std_logic;
       snac_dtr              : out std_logic;
       snac_dsr              : in  std_logic;
+      link_assist_mode      : in  std_logic_vector(1 downto 0);
       sio_debug_bus         : out std_logic_vector(255 downto 0);
       sio_raw_debug_bus     : out std_logic_vector(95 downto 0);
 		
@@ -648,6 +649,7 @@ begin
       snac_cts              => snac_cts,
       snac_dtr              => snac_dtr,
       snac_dsr              => snac_dsr,
+      link_assist_mode      => link_assist_mode,
       sio_debug_bus         => sio_debug_bus,
       sio_raw_debug_bus     => sio_raw_debug_bus,
 		

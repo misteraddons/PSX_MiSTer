@@ -376,6 +376,7 @@ parameter CONF_STR = {
 	"D8O[52:49],Pad2,Dualshock,Off,Digital,Analog,GunCon,NeGcon,Wheel-NegCon,Wheel-Analog,Mouse,Justifier,SNAC-port2,Analog Joystick,Pop'n;",
 	"D8h0O[66],SNAC MemCard,Virtual,Real;",
 	"O[92],System Link,Off,USER_IO;",
+	"O[94:93],System Link Assist,Off,Host,Slave,Slave+Edge;",
 	"D8hFO[91],NeGcon Rumble,Off,On;",
 	"D8h2O[9],Show Crosshair,Off,On;",
 	"D8h4O[31],DS Mode,L3+R3+Up/Dn | Click,L1+L2+R1+R2+Up/Dn;",
@@ -879,6 +880,7 @@ wire PadPortPopn2    = (status[52:49] == 4'b1100);
 
 // USER_IO System Link
 wire userIoSystemLink = status[92];
+wire [1:0] systemLinkAssist = userIoSystemLink ? status[94:93] : 2'b00;
 
 reg paddleMode = 0;
 reg paddleMin = 0;
@@ -1303,6 +1305,7 @@ psx
    .snac_cts(snac_cts),
    .snac_dtr(snac_dtr),
    .snac_dsr(snac_dsr),
+   .link_assist_mode(systemLinkAssist),
    .sio_debug_bus(sio_debug_bus),
    .sio_raw_debug_bus(sio_raw_debug_bus),
 
@@ -1817,6 +1820,9 @@ wire [95:0] sio_raw_debug_bus;
 (* keep = 1, preserve = 1, noprune = 1 *) reg [7:0] dbg_syslink_sio_data;
 (* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_decoded_data_write;
 (* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_txen_latched;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_sio_link_ready;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_sio_tx_start_seen;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [3:0] dbg_syslink_rx_fifo_count;
 (* keep = 1, preserve = 1, noprune = 1 *) reg [7:0] dbg_syslink_write_data_raw_count;
 (* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_raw_window;
 (* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_raw_read;
@@ -1826,11 +1832,166 @@ wire [95:0] sio_raw_debug_bus;
 (* keep = 1, preserve = 1, noprune = 1 *) reg [3:0] dbg_syslink_raw_write_mask;
 (* keep = 1, preserve = 1, noprune = 1 *) reg [7:0] dbg_syslink_raw_write_count;
 (* keep = 1, preserve = 1, noprune = 1 *) reg [7:0] dbg_syslink_raw_data_write_count;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_capture_trigger;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_exact_data_write;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_exact_stat_write;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_exact_mode_write;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_exact_ctrl_write;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_exact_misc_write;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_exact_baud_write;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [3:0] dbg_syslink_exact_write_kind;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [3:0] dbg_syslink_exact_write_offset;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [31:0] dbg_syslink_exact_write_value;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [7:0] dbg_syslink_exact_data_write_count;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [7:0] dbg_syslink_exact_stat_write_count;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [7:0] dbg_syslink_exact_mode_write_count;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [7:0] dbg_syslink_exact_ctrl_write_count;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [7:0] dbg_syslink_exact_baud_write_count;
 (* keep = 1, preserve = 1, noprune = 1 *) reg [3:0] dbg_syslink_last_read_addr;
 (* keep = 1, preserve = 1, noprune = 1 *) reg [31:0] dbg_syslink_last_read_data;
 (* keep = 1, preserve = 1, noprune = 1 *) reg [31:0] dbg_syslink_last_write_word;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [6:0] dbg_syslink_user_in_pins;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [6:0] dbg_syslink_user_out_pins;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_phys_rxd;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_phys_cts;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_phys_dsr;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [1:0] dbg_syslink_assist_mode;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_assist_configured;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [1:0] dbg_syslink_assist_state;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_effective_cts;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_effective_dsr;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_assist_edge;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_trigger_pulse;
 (* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_data_write_delayed_trigger;
 (* keep = 1, preserve = 1, noprune = 1 *) reg [9:0] dbg_syslink_data_write_trigger_delay;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_trigger_armed;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [23:0] dbg_syslink_trigger_idle_count;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [4:0] dbg_syslink_trigger_pulse_hold;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_trigger_prev_txd;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_trigger_prev_rxd;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_trigger_prev_tx_busy;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_trigger_prev_rx_busy;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_trigger_prev_rts;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_trigger_prev_cts;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_trigger_prev_dtr;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_trigger_prev_dsr;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_trigger_prev_effective_cts;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_trigger_prev_effective_dsr;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_trigger_prev_assist_configured;
+(* keep = 1, preserve = 1, noprune = 1 *) reg dbg_syslink_trigger_prev_assist_edge;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [31:0] dbg_syslink_trigger_prev_stat;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [15:0] dbg_syslink_trigger_prev_ctrl;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [15:0] dbg_syslink_trigger_prev_mode;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [15:0] dbg_syslink_trigger_prev_baud;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [3:0] dbg_syslink_trigger_prev_raw_addr;
+(* keep = 1, preserve = 1, noprune = 1 *) reg [31:0] dbg_syslink_trigger_prev_raw_wdata;
+localparam [23:0] SYS_LINK_TRIGGER_IDLE_CYCLES = 24'd4000000;
+wire dbg_syslink_raw_write_window = sio_raw_debug_bus[66] && sio_raw_debug_bus[67];
+wire [3:0] dbg_syslink_raw_addr_low = sio_raw_debug_bus[3:0];
+wire [31:0] dbg_syslink_raw_wdata_word = sio_raw_debug_bus[60:29];
+wire [3:0] dbg_syslink_raw_wmask = sio_raw_debug_bus[64:61];
+wire [15:0] dbg_syslink_raw_low16_value =
+	(dbg_syslink_raw_wmask[1:0] == 2'b11) ? dbg_syslink_raw_wdata_word[15:0] :
+	dbg_syslink_raw_wmask[0] ? {8'h00, dbg_syslink_raw_wdata_word[7:0]} :
+	dbg_syslink_raw_wmask[1] ? {dbg_syslink_raw_wdata_word[15:8], 8'h00} :
+	16'h0000;
+wire [15:0] dbg_syslink_raw_high16_value =
+	(dbg_syslink_raw_wmask[3:2] == 2'b11) ? dbg_syslink_raw_wdata_word[31:16] :
+	dbg_syslink_raw_wmask[2] ? {8'h00, dbg_syslink_raw_wdata_word[23:16]} :
+	dbg_syslink_raw_wmask[3] ? {dbg_syslink_raw_wdata_word[31:24], 8'h00} :
+	16'h0000;
+wire dbg_syslink_exact_data_write_event = dbg_syslink_raw_write_window &&
+                                          (dbg_syslink_raw_addr_low == 4'h0) &&
+                                          dbg_syslink_raw_wmask[0];
+wire dbg_syslink_exact_stat_write_event = dbg_syslink_raw_write_window &&
+                                          (dbg_syslink_raw_addr_low == 4'h4);
+wire dbg_syslink_exact_mode_write_event = dbg_syslink_raw_write_window &&
+                                          (dbg_syslink_raw_addr_low == 4'h8) &&
+                                          (dbg_syslink_raw_wmask[1:0] != 2'b00);
+wire dbg_syslink_exact_ctrl_write_event = dbg_syslink_raw_write_window &&
+                                          (((dbg_syslink_raw_addr_low == 4'h8) &&
+                                            (dbg_syslink_raw_wmask[3:2] != 2'b00)) ||
+                                           (dbg_syslink_raw_addr_low == 4'hA));
+wire dbg_syslink_exact_misc_write_event = dbg_syslink_raw_write_window &&
+                                          (dbg_syslink_raw_addr_low == 4'hC) &&
+                                          (dbg_syslink_raw_wmask[1:0] != 2'b00);
+wire dbg_syslink_exact_baud_write_event = dbg_syslink_raw_write_window &&
+                                          (((dbg_syslink_raw_addr_low == 4'hC) &&
+                                            (dbg_syslink_raw_wmask[3:2] != 2'b00)) ||
+                                           (dbg_syslink_raw_addr_low == 4'hE));
+wire dbg_syslink_exact_write_any_event = dbg_syslink_exact_data_write_event ||
+                                         dbg_syslink_exact_stat_write_event ||
+                                         dbg_syslink_exact_mode_write_event ||
+                                         dbg_syslink_exact_ctrl_write_event ||
+                                         dbg_syslink_exact_misc_write_event ||
+                                         dbg_syslink_exact_baud_write_event;
+wire [3:0] dbg_syslink_exact_write_kind_next =
+	dbg_syslink_exact_data_write_event ? 4'd1 :
+	dbg_syslink_exact_stat_write_event ? 4'd2 :
+	dbg_syslink_exact_ctrl_write_event ? 4'd4 :
+	dbg_syslink_exact_mode_write_event ? 4'd3 :
+	dbg_syslink_exact_baud_write_event ? 4'd6 :
+	dbg_syslink_exact_misc_write_event ? 4'd5 :
+	4'd0;
+wire [3:0] dbg_syslink_exact_write_offset_next =
+	dbg_syslink_exact_data_write_event ? 4'h0 :
+	dbg_syslink_exact_stat_write_event ? 4'h4 :
+	dbg_syslink_exact_ctrl_write_event ? 4'hA :
+	dbg_syslink_exact_mode_write_event ? 4'h8 :
+	dbg_syslink_exact_baud_write_event ? 4'hE :
+	dbg_syslink_exact_misc_write_event ? 4'hC :
+	dbg_syslink_raw_addr_low;
+wire [31:0] dbg_syslink_exact_write_value_next =
+	dbg_syslink_exact_data_write_event ? {24'h000000, dbg_syslink_raw_wdata_word[7:0]} :
+	dbg_syslink_exact_stat_write_event ? dbg_syslink_raw_wdata_word :
+	dbg_syslink_exact_ctrl_write_event ? {16'h0000, ((dbg_syslink_raw_addr_low == 4'hA) ? dbg_syslink_raw_low16_value : dbg_syslink_raw_high16_value)} :
+	dbg_syslink_exact_mode_write_event ? {16'h0000, dbg_syslink_raw_low16_value} :
+	dbg_syslink_exact_baud_write_event ? {16'h0000, ((dbg_syslink_raw_addr_low == 4'hE) ? dbg_syslink_raw_low16_value : dbg_syslink_raw_high16_value)} :
+	dbg_syslink_exact_misc_write_event ? {16'h0000, dbg_syslink_raw_low16_value} :
+	32'h00000000;
+wire dbg_syslink_trigger_serial_edge = (snac_txd != dbg_syslink_trigger_prev_txd) ||
+                                       (snac_rxd != dbg_syslink_trigger_prev_rxd);
+wire dbg_syslink_trigger_handshake_edge = (snac_rts != dbg_syslink_trigger_prev_rts) ||
+                                          (snac_cts != dbg_syslink_trigger_prev_cts) ||
+                                          (snac_dtr != dbg_syslink_trigger_prev_dtr) ||
+                                          (snac_dsr != dbg_syslink_trigger_prev_dsr);
+wire dbg_syslink_trigger_state_delta = (sio_debug_bus[59:28] != dbg_syslink_trigger_prev_stat) ||
+                                       (sio_debug_bus[75:60] != dbg_syslink_trigger_prev_ctrl) ||
+                                       (sio_debug_bus[91:76] != dbg_syslink_trigger_prev_mode) ||
+                                       (sio_debug_bus[107:92] != dbg_syslink_trigger_prev_baud);
+wire dbg_syslink_data_write_event = sio_debug_bus[224] || dbg_syslink_exact_data_write_event;
+wire dbg_syslink_assist_configured_event = dbg_syslink_assist_configured && !dbg_syslink_trigger_prev_assist_configured;
+wire dbg_syslink_assist_edge_event = dbg_syslink_assist_edge && !dbg_syslink_trigger_prev_assist_edge;
+wire dbg_syslink_effective_handshake_edge =
+	(dbg_syslink_assist_configured || dbg_syslink_trigger_prev_assist_configured) &&
+	((dbg_syslink_effective_cts != dbg_syslink_trigger_prev_effective_cts) ||
+	 (dbg_syslink_effective_dsr != dbg_syslink_trigger_prev_effective_dsr));
+wire dbg_syslink_trigger_raw_write_delta = sio_raw_debug_bus[66] &&
+                                           ((sio_raw_debug_bus[3:0] != dbg_syslink_trigger_prev_raw_addr) ||
+                                            (sio_raw_debug_bus[60:29] != dbg_syslink_trigger_prev_raw_wdata));
+wire dbg_syslink_armed_activity_event = dbg_syslink_trigger_armed &&
+                                        (dbg_syslink_exact_write_any_event ||
+                                         dbg_syslink_trigger_raw_write_delta ||
+                                         ((dbg_syslink_assist_mode != 2'b00) &&
+                                          (dbg_syslink_assist_configured_event ||
+                                           dbg_syslink_assist_edge_event ||
+                                           dbg_syslink_effective_handshake_edge)));
+wire dbg_syslink_capture_trigger_event = userIoSystemLink &&
+                                         (dbg_syslink_data_write_event ||
+                                          dbg_syslink_armed_activity_event);
+wire dbg_syslink_trigger_active = sio_debug_bus[224] ||
+                                  dbg_syslink_exact_write_any_event ||
+                                  (sio_debug_bus[0] && !dbg_syslink_trigger_prev_tx_busy) ||
+                                  (sio_debug_bus[1] && !dbg_syslink_trigger_prev_rx_busy) ||
+                                  dbg_syslink_trigger_serial_edge ||
+                                  dbg_syslink_trigger_handshake_edge ||
+                                  dbg_syslink_assist_configured_event ||
+                                  dbg_syslink_assist_edge_event ||
+                                  dbg_syslink_effective_handshake_edge ||
+                                  dbg_syslink_trigger_state_delta ||
+                                  dbg_syslink_trigger_raw_write_delta;
+wire dbg_syslink_trigger_seen_sio = dbg_syslink_bus_write_seen || dbg_syslink_bus_read_seen ||
+                                    dbg_syslink_raw_window || sio_raw_debug_bus[67];
 always @(posedge clk_1x) begin
 	dbg_syslink_mode <= userIoSystemLink;
 	dbg_syslink_txd <= snac_txd;
@@ -1860,14 +2021,27 @@ always @(posedge clk_1x) begin
 	dbg_syslink_bus_rdata <= sio_debug_bus[175:144];
 	dbg_syslink_stat_raw <= sio_debug_bus[207:176];
 	dbg_syslink_sio_data <= sio_debug_bus[215:208];
-	dbg_syslink_decoded_data_write <= sio_debug_bus[224];
 	dbg_syslink_txen_latched <= sio_debug_bus[225];
+	dbg_syslink_sio_link_ready <= sio_debug_bus[226];
+	dbg_syslink_sio_tx_start_seen <= sio_debug_bus[227];
+	dbg_syslink_rx_fifo_count <= sio_debug_bus[231:228];
 	dbg_syslink_raw_addr <= sio_raw_debug_bus[28:0];
 	dbg_syslink_raw_wdata <= sio_raw_debug_bus[60:29];
 	dbg_syslink_raw_write_mask <= sio_raw_debug_bus[64:61];
 	dbg_syslink_raw_read <= sio_raw_debug_bus[65];
 	dbg_syslink_raw_write <= sio_raw_debug_bus[66];
 	dbg_syslink_raw_window <= sio_raw_debug_bus[67];
+	dbg_syslink_user_in_pins <= USER_IN;
+	dbg_syslink_user_out_pins <= USER_OUT;
+	dbg_syslink_phys_rxd <= USER_IN2_2;
+	dbg_syslink_phys_cts <= USER_IN4_2;
+	dbg_syslink_phys_dsr <= USER_IN3_2;
+	dbg_syslink_assist_mode <= sio_debug_bus[247:246];
+	dbg_syslink_assist_configured <= sio_debug_bus[245];
+	dbg_syslink_assist_state <= sio_debug_bus[244:243];
+	dbg_syslink_effective_cts <= sio_debug_bus[242];
+	dbg_syslink_effective_dsr <= sio_debug_bus[241];
+	dbg_syslink_assist_edge <= sio_debug_bus[240];
 
 	if (!userIoSystemLink) begin
 		dbg_syslink_bus_write_seen <= 1'b0;
@@ -1888,18 +2062,98 @@ always @(posedge clk_1x) begin
 		dbg_syslink_write_data_raw_count <= 8'd0;
 		dbg_syslink_raw_write_count <= 8'd0;
 		dbg_syslink_raw_data_write_count <= 8'd0;
+		dbg_syslink_capture_trigger <= 1'b0;
+		dbg_syslink_trigger_pulse <= 1'b0;
+		dbg_syslink_exact_data_write <= 1'b0;
+		dbg_syslink_exact_stat_write <= 1'b0;
+		dbg_syslink_exact_mode_write <= 1'b0;
+		dbg_syslink_exact_ctrl_write <= 1'b0;
+		dbg_syslink_exact_misc_write <= 1'b0;
+		dbg_syslink_exact_baud_write <= 1'b0;
+		dbg_syslink_exact_write_kind <= 4'd0;
+		dbg_syslink_exact_write_offset <= 4'd0;
+		dbg_syslink_exact_write_value <= 32'd0;
+		dbg_syslink_exact_data_write_count <= 8'd0;
+		dbg_syslink_exact_stat_write_count <= 8'd0;
+		dbg_syslink_exact_mode_write_count <= 8'd0;
+		dbg_syslink_exact_ctrl_write_count <= 8'd0;
+		dbg_syslink_exact_baud_write_count <= 8'd0;
 		dbg_syslink_last_read_addr <= 4'd0;
 		dbg_syslink_last_read_data <= 32'd0;
 		dbg_syslink_last_write_word <= 32'd0;
+		dbg_syslink_decoded_data_write <= 1'b0;
 		dbg_syslink_data_write_delayed_trigger <= 1'b0;
 		dbg_syslink_data_write_trigger_delay <= 10'd0;
+		dbg_syslink_trigger_armed <= 1'b0;
+		dbg_syslink_trigger_idle_count <= 24'd0;
+		dbg_syslink_trigger_pulse_hold <= 5'd0;
+		dbg_syslink_trigger_prev_txd <= 1'b1;
+		dbg_syslink_trigger_prev_rxd <= 1'b1;
+		dbg_syslink_trigger_prev_tx_busy <= 1'b0;
+		dbg_syslink_trigger_prev_rx_busy <= 1'b0;
+		dbg_syslink_trigger_prev_rts <= 1'b0;
+		dbg_syslink_trigger_prev_cts <= 1'b1;
+		dbg_syslink_trigger_prev_dtr <= 1'b0;
+		dbg_syslink_trigger_prev_dsr <= 1'b1;
+		dbg_syslink_trigger_prev_effective_cts <= 1'b1;
+		dbg_syslink_trigger_prev_effective_dsr <= 1'b1;
+		dbg_syslink_trigger_prev_assist_configured <= 1'b0;
+		dbg_syslink_trigger_prev_assist_edge <= 1'b0;
+		dbg_syslink_trigger_prev_stat <= 32'd0;
+		dbg_syslink_trigger_prev_ctrl <= 16'd0;
+		dbg_syslink_trigger_prev_mode <= 16'd0;
+		dbg_syslink_trigger_prev_baud <= 16'd0;
+		dbg_syslink_trigger_prev_raw_addr <= 4'd0;
+		dbg_syslink_trigger_prev_raw_wdata <= 32'd0;
 	end else begin
+		dbg_syslink_capture_trigger <= 1'b0;
+		dbg_syslink_trigger_pulse <= 1'b0;
+		if (dbg_syslink_trigger_pulse_hold != 5'd0) begin
+			dbg_syslink_trigger_pulse <= 1'b1;
+			dbg_syslink_trigger_pulse_hold <= dbg_syslink_trigger_pulse_hold - 5'd1;
+		end
+		dbg_syslink_exact_data_write <= 1'b0;
+		dbg_syslink_exact_stat_write <= 1'b0;
+		dbg_syslink_exact_mode_write <= 1'b0;
+		dbg_syslink_exact_ctrl_write <= 1'b0;
+		dbg_syslink_exact_misc_write <= 1'b0;
+		dbg_syslink_exact_baud_write <= 1'b0;
+		dbg_syslink_decoded_data_write <= dbg_syslink_data_write_event;
 		dbg_syslink_data_write_delayed_trigger <= 1'b0;
+		dbg_syslink_data_write_trigger_delay <= 10'd0;
 		if (sio_raw_debug_bus[66]) begin
 			dbg_syslink_raw_write_count <= dbg_syslink_raw_write_count + 8'd1;
-			if (sio_raw_debug_bus[3:0] == 4'h0) begin
+			if (dbg_syslink_exact_data_write_event) begin
 				dbg_syslink_raw_data_write_count <= dbg_syslink_raw_data_write_count + 8'd1;
 			end
+		end
+		if (dbg_syslink_exact_write_any_event) begin
+			dbg_syslink_exact_write_kind <= dbg_syslink_exact_write_kind_next;
+			dbg_syslink_exact_write_offset <= dbg_syslink_exact_write_offset_next;
+			dbg_syslink_exact_write_value <= dbg_syslink_exact_write_value_next;
+		end
+		if (dbg_syslink_exact_data_write_event) begin
+			dbg_syslink_exact_data_write <= 1'b1;
+			dbg_syslink_exact_data_write_count <= dbg_syslink_exact_data_write_count + 8'd1;
+		end
+		if (dbg_syslink_exact_stat_write_event) begin
+			dbg_syslink_exact_stat_write <= 1'b1;
+			dbg_syslink_exact_stat_write_count <= dbg_syslink_exact_stat_write_count + 8'd1;
+		end
+		if (dbg_syslink_exact_mode_write_event) begin
+			dbg_syslink_exact_mode_write <= 1'b1;
+			dbg_syslink_exact_mode_write_count <= dbg_syslink_exact_mode_write_count + 8'd1;
+		end
+		if (dbg_syslink_exact_ctrl_write_event) begin
+			dbg_syslink_exact_ctrl_write <= 1'b1;
+			dbg_syslink_exact_ctrl_write_count <= dbg_syslink_exact_ctrl_write_count + 8'd1;
+		end
+		if (dbg_syslink_exact_misc_write_event) begin
+			dbg_syslink_exact_misc_write <= 1'b1;
+		end
+		if (dbg_syslink_exact_baud_write_event) begin
+			dbg_syslink_exact_baud_write <= 1'b1;
+			dbg_syslink_exact_baud_write_count <= dbg_syslink_exact_baud_write_count + 8'd1;
 		end
 		if (sio_debug_bus[7]) begin
 			dbg_syslink_bus_write_seen <= 1'b1;
@@ -1919,12 +2173,25 @@ always @(posedge clk_1x) begin
 		end
 		if (sio_debug_bus[224]) begin
 			dbg_syslink_write_data_raw_count <= dbg_syslink_write_data_raw_count + 8'd1;
-			dbg_syslink_data_write_trigger_delay <= 10'd512;
-		end else if (dbg_syslink_data_write_trigger_delay != 10'd0) begin
-			dbg_syslink_data_write_trigger_delay <= dbg_syslink_data_write_trigger_delay - 10'd1;
-			if (dbg_syslink_data_write_trigger_delay == 10'd1) begin
-				dbg_syslink_data_write_delayed_trigger <= 1'b1;
+		end
+		if (dbg_syslink_data_write_event) begin
+			dbg_syslink_decoded_data_write <= 1'b1;
+		end
+		if (dbg_syslink_trigger_seen_sio) begin
+			if (dbg_syslink_trigger_active) begin
+				dbg_syslink_trigger_idle_count <= 24'd0;
+			end else if (dbg_syslink_trigger_idle_count < SYS_LINK_TRIGGER_IDLE_CYCLES) begin
+				dbg_syslink_trigger_idle_count <= dbg_syslink_trigger_idle_count + 24'd1;
+			end else begin
+				dbg_syslink_trigger_armed <= 1'b1;
 			end
+		end
+		if (dbg_syslink_capture_trigger_event) begin
+			dbg_syslink_capture_trigger <= 1'b1;
+			dbg_syslink_trigger_pulse <= 1'b1;
+			dbg_syslink_trigger_pulse_hold <= 5'd16;
+			dbg_syslink_trigger_armed <= 1'b0;
+			dbg_syslink_trigger_idle_count <= 24'd0;
 		end
 		if (sio_debug_bus[6]) begin
 			dbg_syslink_bus_read_seen <= 1'b1;
@@ -1937,6 +2204,26 @@ always @(posedge clk_1x) begin
 				2'b10: dbg_syslink_read_ctrl_count <= dbg_syslink_read_ctrl_count + 8'd1;
 				2'b11: dbg_syslink_read_baud_count <= dbg_syslink_read_baud_count + 8'd1;
 			endcase
+		end
+		dbg_syslink_trigger_prev_txd <= snac_txd;
+		dbg_syslink_trigger_prev_rxd <= snac_rxd;
+		dbg_syslink_trigger_prev_tx_busy <= sio_debug_bus[0];
+		dbg_syslink_trigger_prev_rx_busy <= sio_debug_bus[1];
+		dbg_syslink_trigger_prev_rts <= snac_rts;
+		dbg_syslink_trigger_prev_cts <= snac_cts;
+		dbg_syslink_trigger_prev_dtr <= snac_dtr;
+		dbg_syslink_trigger_prev_dsr <= snac_dsr;
+		dbg_syslink_trigger_prev_effective_cts <= dbg_syslink_effective_cts;
+		dbg_syslink_trigger_prev_effective_dsr <= dbg_syslink_effective_dsr;
+		dbg_syslink_trigger_prev_assist_configured <= dbg_syslink_assist_configured;
+		dbg_syslink_trigger_prev_assist_edge <= dbg_syslink_assist_edge;
+		dbg_syslink_trigger_prev_stat <= sio_debug_bus[59:28];
+		dbg_syslink_trigger_prev_ctrl <= sio_debug_bus[75:60];
+		dbg_syslink_trigger_prev_mode <= sio_debug_bus[91:76];
+		dbg_syslink_trigger_prev_baud <= sio_debug_bus[107:92];
+		if (sio_raw_debug_bus[66]) begin
+			dbg_syslink_trigger_prev_raw_addr <= sio_raw_debug_bus[3:0];
+			dbg_syslink_trigger_prev_raw_wdata <= sio_raw_debug_bus[60:29];
 		end
 	end
 
@@ -1952,6 +2239,13 @@ always @(posedge clk_1x) begin
 	dbg_syslink_bus[8] <= dbg_syslink_cts;
 	dbg_syslink_bus[9] <= dbg_syslink_dtr;
 	dbg_syslink_bus[10] <= dbg_syslink_dsr;
+	dbg_syslink_bus[11] <= dbg_syslink_effective_cts;
+	dbg_syslink_bus[12] <= dbg_syslink_effective_dsr;
+	dbg_syslink_bus[14:13] <= dbg_syslink_assist_mode;
+	dbg_syslink_bus[16:15] <= dbg_syslink_assist_state;
+	dbg_syslink_bus[17] <= dbg_syslink_assist_configured;
+	dbg_syslink_bus[18] <= dbg_syslink_assist_edge;
+	dbg_syslink_bus[19] <= dbg_syslink_trigger_pulse;
 	dbg_syslink_bus[39:32] <= sio_debug_bus[7:0];
 	dbg_syslink_bus[43:40] <= sio_debug_bus[11:8];
 	dbg_syslink_bus[51:44] <= sio_debug_bus[19:12];
@@ -1986,6 +2280,7 @@ wire [7:0]PSdatalength;
 
 reg USER_IN0_1;
 reg USER_IN1_1;
+reg USER_IN2_1;
 reg USER_IN3_1;
 reg USER_IN4_1;
 reg USER_IN5_1;
@@ -1993,6 +2288,7 @@ reg USER_IN6_1;
 
 reg USER_IN0_2;
 reg USER_IN1_2;
+reg USER_IN2_2;
 reg USER_IN3_2;
 reg USER_IN4_2;
 reg USER_IN5_2;
@@ -2009,6 +2305,7 @@ begin
 
    USER_IN0_1 <= USER_IN[0];
    USER_IN1_1 <= USER_IN[1];
+   USER_IN2_1 <= USER_IN[2];
    USER_IN3_1 <= USER_IN[3];
    USER_IN4_1 <= USER_IN[4];
    USER_IN5_1 <= USER_IN[5];
@@ -2016,6 +2313,7 @@ begin
 
    USER_IN0_2 <= USER_IN0_1;
    USER_IN1_2 <= USER_IN1_1;
+   USER_IN2_2 <= USER_IN2_1;
    USER_IN3_2 <= USER_IN3_1;
    USER_IN4_2 <= USER_IN4_1;
    USER_IN5_2 <= USER_IN5_1;
@@ -2026,14 +2324,15 @@ begin
    ackglitch  <= ~USER_IN3_1 && ~USER_IN3_2 && ~USER_IN3_3 && ~USER_IN3_4 ? 1'b0 : 1'b1;
 
 	if (userIoSystemLink) begin
-		// USER_IO system link mode. Cross D+ to D-, SSTX+ to SSRX+, and SSTX- to SSRX-.
-		USER_OUT[0] <= snac_dtr;   // USB D+ output, crossed by cable to remote D-/DSR
-		USER_OUT[1] <= 1'b1;       // USB D- input from remote D+/DTR
-		USER_OUT[2] <= snac_rts;   // USB3 SSTX- output, crossed by cable to remote SSRX-/CTS
-		USER_OUT[3] <= 1'b1;       // Drain/release
-		USER_OUT[4] <= 1'b1;       // USB3 SSRX+ input from remote SSTX+/TXD
-		USER_OUT[5] <= 1'b1;       // USB3 SSRX- input from remote SSTX-/RTS
-		USER_OUT[6] <= snac_txd;   // USB3 SSTX+ output, crossed by cable to remote SSRX+/RXD
+		// USER_IO system link mode, compatible with GB/JagLink data wiring:
+		// D+ straight for GB clock, D- crosses to remote SSTX- for serial data.
+		USER_OUT[0] <= 1'b1;       // USB D+ released; GB/GBC uses this as straight clock
+		USER_OUT[1] <= snac_txd;   // USB D- output, crossed by cable to remote SSTX-/RXD
+		USER_OUT[2] <= 1'b1;       // USB3 SSTX- input from remote D-/TXD
+		USER_OUT[3] <= 1'b1;       // Drain input from remote SSRX-/DTR
+		USER_OUT[4] <= 1'b1;       // USB3 SSRX+ input from remote SSTX+/RTS
+		USER_OUT[5] <= snac_dtr;   // USB3 SSRX- output, crossed by cable to remote Drain/DSR
+		USER_OUT[6] <= snac_rts;   // USB3 SSTX+ output, crossed by cable to remote SSRX+/CTS
 		
 		// Not used in system link mode
 		ack         <= 1'b1;       
@@ -2043,10 +2342,10 @@ begin
 `ifdef SYSTEM_LINK_DIAG_LOOPBACK
 		snac_rxd    <= snac_txd;
 `else
-		snac_rxd    <= USER_IN4_2;
+		snac_rxd    <= USER_IN2_2;
 `endif
-		snac_cts    <= USER_IN5_2;
-		snac_dsr    <= USER_IN1_2;
+		snac_cts    <= USER_IN4_2;
+		snac_dsr    <= USER_IN3_2;
 	end
 	else if (snacPort1 || snacPort2) begin
 		USER_OUT[0] <= ~selectedPort2Snac;
