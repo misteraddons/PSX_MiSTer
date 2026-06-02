@@ -117,14 +117,14 @@ architecture arch of sio is
          when "00" =>
             return (others => '0');
          when "01" =>
-            factor := to_unsigned(1, 24);
-            cycles := resize(baud, 24);
+            factor := to_unsigned(2, 24);
+            cycles := shift_left(resize(baud, 24), 1);
          when "10" =>
-            factor := to_unsigned(16, 24);
-            cycles := shift_left(resize(baud, 24), 4);
+            factor := to_unsigned(32, 24);
+            cycles := shift_left(resize(baud, 24), 5);
          when "11" =>
-            factor := to_unsigned(64, 24);
-            cycles := shift_left(resize(baud, 24), 6);
+            factor := to_unsigned(128, 24);
+            cycles := shift_left(resize(baud, 24), 7);
          when others =>
             return (others => '0');
       end case;
@@ -770,6 +770,8 @@ begin
                      if rx_sync(2) = '0' then
                         stat_v(5) := '1';
                         rx_frame_count <= rx_frame_count + 1;
+                     elsif ctrl_v(5) = '0' then
+                        rx_idle_qualified_v := '1';
                      elsif rx_count_v = 8 then
                         rx_idle_qualified_v := '1';
                         rx_last_ptr_v := rx_wr_ptr_v - 1;
