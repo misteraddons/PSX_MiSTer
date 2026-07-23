@@ -152,9 +152,9 @@ architecture arch of sio is
       if mask(1 downto 0) = "11" then
          return data(15 downto 0);
       elsif mask(0) = '1' then
-         return x"00" & data(7 downto 0);
+         return current(15 downto 8) & data(7 downto 0);
       elsif mask(1) = '1' then
-         return data(15 downto 8) & x"00";
+         return data(15 downto 8) & current(7 downto 0);
       end if;
 
       return current;
@@ -167,9 +167,9 @@ architecture arch of sio is
       if mask(3 downto 2) = "11" then
          return data(31 downto 16);
       elsif mask(2) = '1' then
-         return x"00" & data(23 downto 16);
+         return current(15 downto 8) & data(23 downto 16);
       elsif mask(3) = '1' then
-         return data(31 downto 24) & x"00";
+         return data(31 downto 24) & current(7 downto 0);
       end if;
 
       return current;
@@ -629,6 +629,7 @@ begin
                   stat_v(5 downto 3) := (others => '0');
                   irq_v := '0';
                   irq_rearm_block_v := '1';
+                  ctrl_v(4) := '0';
                end if;
 
                if ctrl_v(6) = '1' then
